@@ -1,0 +1,205 @@
+# Loading libraries
+library("tidyverse")
+library("tidytext")
+library("here")
+library("janitor")
+library("skimr")
+library("dplyr")
+library("Tmisc")
+library("stats")
+library("stargazer")
+library("writexl")
+library("plm")
+library("ggplot2")
+library("scales")
+library("fastDummies")
+library("pdftools")
+library("pastecs")
+library("Hmisc")
+library("lmtest")
+
+#Load Data
+Data <- read.csv(file.choose(), header = TRUE)
+
+#View Data
+View(Data)
+
+#Inspecting Data
+colnames(Data)
+glimpse(Data)
+head(Data)
+skim_without_charts(Data)
+
+# Checking for missing data in data set
+Data %>%
+  map(~sum(is.na(.)))
+
+# Dropping Survival rate column
+Data1 <- Data %>%
+  select(-c(Survival.rate))
+
+colnames(Data1)
+
+view(Data1)
+
+#Renaming columns
+Data1 <- rename(Data1,"Year" = "YEAR",
+                "GER_primary_All_gender" = "Gross.enrolment.ratio",
+                "GER_primary_female" = "Gross.enrolment.ratio..female",
+                "GER_GPI" = "Gross.enrolment.ratio...GPI.",
+                "Pupil_teacher_ratio_primary" = "Pupil.teacher.ratio..primary",
+                "Time" = "Study.Period..Time.",
+                "EdSeP_Period" = "Time.after.Intervention",
+                "Years_after_EdSeP" = "Intervention.Period",
+                "GDP_per_capita" = "GDP.per.capita.growth..annual...",
+                "GDP_growth" = "GDP.growth..annual...",
+                "Govt_expendtiure_education" = "Government.expenditure.on.education..total....of.GDP.",
+                "Primary_educ_teachers" = "Primary.education..teachers",
+                "Life_Expectancy" = "Life.expectancy.at.birth..total..years.",
+                "Inflation" = "Inflation..consumer.prices..annual...",
+                "Population_growth" = "Population.growth..annual...",
+                "HIV_rate" = "Prevalence.of.HIV..total....of.population.ages.15.49."
+        
+                                )
+
+colnames(Data1)
+
+str(Data1)
+view(Data1)
+
+# Descriptive Statistics
+
+summary(Data1)
+
+
+Standard_Deviations <- Data1 %>%
+  summarise(SD_of_GER = sd(GER_primary_All_gender, na.rm = TRUE),
+            SD_of_GER_female = sd(GER_primary_female, na.rm = TRUE),
+            SD_of_GER_GPI = sd(GER_GPI, na.rm = TRUE),
+            SD_of_PTR = sd(Pupil_teacher_ratio_primary, na.rm = TRUE),
+            SD_EdSeP = sd(EdSeP_Period, na.rm = TRUE),
+            SD_Yr_EdSeP = sd(Years_after_EdSeP, na.rm = TRUE),
+            SD_GDPCapita = sd(GDP_per_capita, na.rm = TRUE),
+            SD_GDP_Growth = sd(GDP_growth, na.rm = TRUE),
+            SD_Edu_Exp = sd(Govt_expendtiure_education, na.rm = TRUE),
+            SD_Primary_Teachers = sd(Primary_educ_teachers, na.rm = TRUE),
+            SD_LE = sd(Life_Expectancy, na.rm = TRUE),
+            SD_Inflation = sd(Inflation, na.rm = TRUE),
+            SD_Pop = sd(Population_growth, na.rm = TRUE),
+            SD_HIV = sd(HIV_rate, na.rm = TRUE)
+            )
+
+view(Standard_Deviations)
+
+# New Data set with only independent variables
+Data2 <- Data1 %>%
+  select(-c(Year,GER_primary_All_gender,GER_primary_female,GER_GPI,
+            Pupil_teacher_ratio_primary,Time,EdSeP_Period,
+            Years_after_EdSeP))
+
+# Correlation of independent variables
+
+correlation_matrix <- cor(Data2, use = "complete.obs")
+
+
+stargazer(correlation_matrix)
+
+# ITS Base Regressions
+
+reg1 = lm (GER_primary_All_gender ~ Time + EdSeP_Period + Years_after_EdSeP, data=Data1)
+summary(reg1)
+pred_reg1 <- predict(reg1,Data1)
+
+dev.off()
+
+plot(Data1$GER_primary_All_gender,
+     col = "black",
+          xlab = "Time (Years)",
+     ylab = "GER for all Gender"
+     )
+lines(pred_reg1, col = "dodgerblue4", lwd = 3)
+abline(v=14, col="red", lty =20)
+
+
+reg2 = lm (GER_primary_female ~ Time + EdSeP_Period + Years_after_EdSeP, data=Data1)
+summary(reg2)
+pred_reg2 <- predict(reg2,Data1)
+
+plot(Data1$GER_primary_female,
+     col = "black",
+     xlab = "Time (Years)",
+     ylab = "GER for females"
+)
+lines(pred_reg2, col = "dodgerblue4", lwd = 3)
+abline(v=14, col="red", lty =20)
+
+
+reg3 = lm (Pupil_teacher_ratio_primary ~ Time + EdSeP_Period + Years_after_EdSeP, data=Data1)
+summary(reg3)
+pred_reg3 <- predict(reg3,Data1)
+
+plot(Data1$Pupil_teacher_ratio_primary,
+     col = "black",
+     xlab = "Time (Years)",
+     ylab = "Pupil-Teacher Ratio"
+)
+lines(pred_reg3, col = "dodgerblue4", lwd = 3)
+abline(v=14, col="red", lty =20)
+
+stargazer(reg1,reg2,reg3)
+
+##reg4 = lm (GER_GPI ~ Time + EdSeP_Period + Years_after_EdSeP, data=Data1)
+##summary(reg4)
+
+#Testing for autocorrelation
+
+dwtest(Data1$GER_primary_All_gender~Data1$Time)
+
+dwtest(Data1$GER_primary_female~Data1$Time)
+
+dwtest(Data1$Pupil_teacher_ratio_primary~Data1$Time)
+
+
+# ITS Base Regressions plus independent variables
+
+F1 = lm (GER_primary_All_gender ~ Time + EdSeP_Period + Years_after_EdSeP + GDP_per_capita +
+           GDP_growth + Govt_expendtiure_education + Primary_educ_teachers +
+           Life_Expectancy + Inflation + Population_growth + HIV_rate, data=Data1)
+summary(F1)
+
+
+F2 = lm (GER_primary_female ~ Time + EdSeP_Period + Years_after_EdSeP + GDP_per_capita +
+           GDP_growth + Govt_expendtiure_education + Primary_educ_teachers +
+           Life_Expectancy + Inflation + Population_growth + HIV_rate, data=Data1)
+summary(F2)
+
+
+F3 = lm ( Pupil_teacher_ratio_primary ~ Time + EdSeP_Period + Years_after_EdSeP + GDP_per_capita +
+           GDP_growth + Govt_expendtiure_education + Primary_educ_teachers +
+           Life_Expectancy + Inflation + Population_growth + HIV_rate, data=Data1)
+summary(F3)
+
+stargazer(F1,F2,F3)
+
+
+# With Independet set 2 (Dropping GDP growth)
+
+D1 = lm (GER_primary_All_gender ~ Time + EdSeP_Period + Years_after_EdSeP +
+           GDP_per_capita + Govt_expendtiure_education + Primary_educ_teachers +
+            Life_Expectancy + Inflation + Population_growth + HIV_rate, data=Data1)
+summary(D1)
+
+D2 = lm (GER_primary_female ~ Time + EdSeP_Period + Years_after_EdSeP +
+           GDP_per_capita + Govt_expendtiure_education + Primary_educ_teachers +
+           Life_Expectancy + Inflation + Population_growth + HIV_rate, data=Data1)
+summary(D2)
+
+D3 = lm (Pupil_teacher_ratio_primary ~ Time + EdSeP_Period + Years_after_EdSeP +
+           GDP_per_capita + Govt_expendtiure_education + Primary_educ_teachers +
+           Life_Expectancy + Inflation + Population_growth + HIV_rate, data=Data1)
+summary(D3)
+
+stargazer(D1,D2,D3)
+
+
+
